@@ -1,6 +1,21 @@
-from fastai.text import *
-import sentencepiece as spm
+import pickle
 from pathlib import Path
+from typing import List
+
+try:
+    from fastai.text import *  # noqa: F401,F403  (English tokenizer and fastai integration)
+except Exception:  # fastai v1 is optional; Indic tokenization only needs sentencepiece
+    class BaseTokenizer:
+        """Minimal stand-in for fastai's BaseTokenizer when fastai is not installed."""
+
+        def __init__(self, lang: str):
+            self.lang = lang
+
+        def tokenizer(self, t: str) -> List[str]:
+            return t.split(' ')
+
+        def add_special_cases(self, toks):
+            pass
 
 from inltk.config import LanguageCodes
 from inltk.utils import handle_all_caps, handle_upper_case_first_letter, lower_case_everything
@@ -57,10 +72,18 @@ class EnglishTokenizer(BaseTokenizer):
 
 class IndicTokenizer(BaseTokenizer):
     def __init__(self, lang: str):
+        import sentencepiece as spm
         self.lang = lang
         self.sp = spm.SentencePieceProcessor()
         model_path = path/f'models/{lang}/tokenizer.model'
-        self.sp.Load(str(model_path))
+        try:
+            self.sp.Load(str(model_path))
+        except (RuntimeError, OSError) as error:
+            raise RuntimeError(
+                f'The tokenizer model for "{lang}" at {model_path} could not be loaded. It is '
+                f'probably a broken download. Run inltk.inltk.reset_models("{lang}") and then '
+                f'setup("{lang}") again.'
+            ) from error
 
     def tokenizer(self, t: str) -> List[str]:
         return self.sp.EncodeAsPieces(t)

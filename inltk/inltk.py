@@ -1,13 +1,23 @@
 import sys
 import warnings
-import asyncio
 import random
 from math import ceil
-from sklearn.metrics.pairwise import cosine_similarity
+from pathlib import Path
+from typing import Callable
 
-from fastai.text import *
+import numpy as np
+
+try:
+    # fastai v1 is only needed for the model-based features (prediction, embeddings,
+    # similarity, language identification). Tokenization works without it.
+    from fastai.text import *  # noqa: F401,F403
+    _FASTAI_IMPORT_ERROR = None
+except Exception as _error:  # ImportError, or incompatible torch/fastai versions
+    _FASTAI_IMPORT_ERROR = _error
+
 from inltk.config import LanguageCodes
-from inltk.download_assets import setup_language, verify_language, check_all_languages_identifying_model
+from inltk.download_assets import setup_language_sync, verify_language, \
+    check_all_languages_identifying_model_sync
 from inltk.tokenizer import LanguageTokenizer
 from inltk.const import tokenizer_special_cases
 from inltk.utils import cos_sim, reset_models, is_english
@@ -19,19 +29,20 @@ lcodes = LanguageCodes()
 all_language_codes = lcodes.get_all_language_codes()
 
 
-async def download(language_code: str):
-    if language_code not in all_language_codes:
-        raise Exception(f'Language code should be one of {all_language_codes} and not {language_code}')
-    learn = await setup_language(language_code)
-    return learn
+def _require_fastai(feature: str):
+    if _FASTAI_IMPORT_ERROR is not None:
+        raise ImportError(
+            f'{feature} needs fastai v1, which could not be imported '
+            f'({_FASTAI_IMPORT_ERROR!r}). Tokenization works without it. '
+            f'See the README section "Model-based features" for supported setups.'
+        ) from _FASTAI_IMPORT_ERROR
 
 
 def setup(language_code: str):
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    loop = asyncio.get_event_loop()
-    tasks = [asyncio.ensure_future(download(language_code))]
-    learn = loop.run_until_complete(asyncio.gather(*tasks))[0]
-    loop.close()
+    """Download the models for language_code. Safe to call from scripts, Jupyter and Colab."""
+    if language_code not in all_language_codes:
+        raise Exception(f'Language code should be one of {all_language_codes} and not {language_code}')
+    return setup_language_sync(language_code)
 
 
 def check_input_language(language_code: str):
@@ -44,6 +55,7 @@ def check_input_language(language_code: str):
 
 
 def predict_next_words(input: str, n_words: int, language_code: str, randomness=0.8):
+    _require_fastai('predict_next_words')
     check_input_language(language_code)
     defaults.device = torch.device('cpu')
     path = Path(__file__).parent
@@ -67,11 +79,8 @@ def tokenize(input: str, language_code: str):
 def identify_language(input: str):
     if is_english(input):
         return 'en'
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    loop = asyncio.get_event_loop()
-    tasks = [asyncio.ensure_future(check_all_languages_identifying_model())]
-    done = loop.run_until_complete(asyncio.gather(*tasks))[0]
-    loop.close()
+    _require_fastai('identify_language')
+    check_all_languages_identifying_model_sync()
     defaults.device = torch.device('cpu')
     path = Path(__file__).parent
     learn = load_learner(path / 'models' / 'all')
@@ -91,6 +100,7 @@ def reset_language_identifying_models():
 
 
 def get_embedding_vectors(input: str, language_code: str):
+    _require_fastai('get_embedding_vectors')
     check_input_language(language_code)
     tok = LanguageTokenizer(language_code)
     token_ids = tok.numericalize(input)
@@ -109,6 +119,7 @@ def get_embedding_vectors(input: str, language_code: str):
 
 
 def get_sentence_encoding(input: str, language_code: str):
+    _require_fastai('get_sentence_encoding')
     check_input_language(language_code)
     tok = LanguageTokenizer(language_code)
     token_ids = tok.numericalize(input)
@@ -130,6 +141,7 @@ def get_sentence_similarity(sen1: str, sen2: str, language_code: str, cmp: Calla
 
 
 def get_similar_sentences(sen: str, no_of_variations: int, language_code: str, degree_of_aug: float = 0.1):
+    _require_fastai('get_similar_sentences')
     check_input_language(language_code)
     # get embedding vectors for sen
     tok = LanguageTokenizer(language_code)
@@ -144,7 +156,8 @@ def get_similar_sentences(sen: str, no_of_variations: int, language_code: str, d
     embeddings = encoder.state_dict()['encoder.weight']
     embeddings = np.array(embeddings)
     # cos similarity of vectors
-    scores = cosine_similarity(embedding_vectors,embeddings)
+    from sklearn.metrics.pairwise import cosine_similarity
+    scores = cosine_similarity(embedding_vectors, embeddings)
     word_ids = [np.argpartition(-np.array(score), no_of_variations+1)[:no_of_variations+1] for score in scores]
     word_ids = [ids.tolist() for ids in word_ids]
     for i, ids in enumerate(word_ids):

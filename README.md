@@ -12,6 +12,36 @@ Checkout detailed docs along with Installation instructions
  at https://inltk.readthedocs.io
 
 
+### Installation
+
+```bash
+pip install inltk            # tokenization (works on current Python versions)
+pip install "inltk[models]"  # also installs the fastai v1 stack for model-based features
+```
+
+Then download the files for your language once:
+
+```python
+from inltk.inltk import setup, tokenize
+setup('te')   # safe to call in scripts, Jupyter and Colab
+tokenize('నేను తెలుగు మాట్లాడతాను', 'te')
+```
+
+#### Model-based features
+
+`predict_next_words`, `get_embedding_vectors`, `get_sentence_encoding`,
+`get_sentence_similarity`, `get_similar_sentences` and `identify_language` load
+models trained with fastai v1 (`fastai==1.0.57`). That version only installs on
+older Python versions and older PyTorch releases. If it is not available, these
+functions raise an `ImportError` that says so, while `setup`, `tokenize` and
+`remove_foreign_languages` keep working for the Indic and code-mixed languages
+(English tokenization also uses fastai and spaCy).
+
+If a download is interrupted or a model link returns an error page, `setup`
+now raises a clear error instead of saving a broken file. To retry a language,
+run `from inltk.inltk import reset_models; reset_models('te')` and then
+`setup('te')` again.
+
 ### Supported languages
 
 #### Native languages
