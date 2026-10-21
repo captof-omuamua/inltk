@@ -18,30 +18,19 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: POSIX :: Linux"
     ],
-    dependency_links=[
-        'http://download.pytorch.org/whl/cpu/torch-1.0.0-cp36-cp36m-linux_x86_64.whl'
-    ],
+    python_requires=">=3.8",
     install_requires=[
-        'aiohttp>=3.5.4',
-        'async-timeout>=3.0.1',
-        "Pillow",
-        "beautifulsoup4",
-        "bottleneck",
-        "dataclasses;python_version<'3.7'",
-        "fastprogress>=0.1.19",
-        "matplotlib",
-        "numexpr",
         "numpy>=1.15",
-        "nvidia-ml-py3",
-        "packaging",
-        "pandas",
-        "pynvx>=1.0.0;platform_system=='Darwin'",
-        "pyyaml",
-        "requests",
-        "scipy",
-        "spacy>=2.0.18",
-        "typing",
-        'fastai==1.0.57',
-        "sentencepiece"
+        "sentencepiece",
     ],
+    extras_require={
+        # Model-based features (predict_next_words, embeddings, similarity,
+        # identify_language) need the original fastai v1 stack, which only
+        # installs on older Python versions.
+        "models": [
+            "fastai==1.0.57",
+            "scikit-learn",
+            "spacy>=2.0.18",
+        ],
+    },
 )

@@ -3,7 +3,7 @@ dist/*
 inltk.egg-info/*
 inltk/models/*
 .idea/
-inltk/__pycache__
+__pycache__/
 inltk_test.ipynb
 .ipynb_checkpoints/*
 docs/_build
